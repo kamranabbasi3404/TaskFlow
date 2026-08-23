@@ -1,8 +1,5 @@
 import mongoose from 'mongoose';
 
-const STANDARD_ATLAS_URI =
-  'mongodb://kamranali3404_db_user:qYlGC8iOBw39tPYW@ac-n1cjlhd-shard-00-00.3gspnhp.mongodb.net:27017,ac-n1cjlhd-shard-00-01.3gspnhp.mongodb.net:27017,ac-n1cjlhd-shard-00-02.3gspnhp.mongodb.net:27017/trickleup_task_manager?ssl=true&replicaSet=atlas-x67j7h-shard-0&authSource=admin&appName=taskflowcluster';
-
 interface MongooseCache {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
@@ -21,7 +18,11 @@ if (!cached) {
 }
 
 export async function connectToDatabase(): Promise<typeof mongoose> {
-  const uri = process.env.MONGODB_URI || STANDARD_ATLAS_URI;
+  const uri = process.env.MONGODB_URI;
+
+  if (!uri) {
+    throw new Error('MONGODB_URI is not defined in environment variables');
+  }
 
   if (cached!.conn && cached!.conn.connection.readyState === 1) {
     return cached!.conn;
@@ -40,7 +41,7 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
     };
 
     cached!.promise = mongoose.connect(uri, opts).then((mongooseInstance) => {
-      console.log('✅ Successfully connected to MongoDB Atlas Cluster via Direct Seedlist!');
+      console.log('✅ Successfully connected to MongoDB Atlas Cluster!');
       return mongooseInstance;
     });
   }
