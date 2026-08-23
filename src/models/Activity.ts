@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IActivity extends Document {
+  userEmail: string;
   action: string;
   message: string;
   taskTitle?: string;
@@ -10,6 +11,7 @@ export interface IActivity extends Document {
 
 const ActivitySchema: Schema = new Schema(
   {
+    userEmail: { type: String, required: true, index: true, lowercase: true, trim: true },
     action: { type: String, required: true },
     message: { type: String, required: true },
     taskTitle: { type: String },

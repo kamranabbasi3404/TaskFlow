@@ -7,6 +7,7 @@ import {
   Moon,
   Database,
   Sparkles,
+  User,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -18,6 +19,8 @@ interface HeaderProps {
   onSeedData: () => void;
   activityCount: number;
   isSeeding?: boolean;
+  userEmail?: string;
+  onOpenEmailModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,6 +31,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSeedData,
   activityCount,
   isSeeding = false,
+  userEmail = '',
+  onOpenEmailModal,
 }) => {
   return (
     <header className="sticky top-0 z-30 w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md transition-colors">
@@ -54,6 +59,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Header Quick Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* User Email Indicator & Switch Button */}
+          {userEmail && (
+            <button
+              onClick={onOpenEmailModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              title="Click to switch user email"
+            >
+              <User className="h-3.5 w-3.5 text-indigo-500" />
+              <span className="max-w-[120px] sm:max-w-[180px] truncate">{userEmail}</span>
+            </button>
+          )}
+
           {/* Seed Demo Data Button */}
           <Button
             variant="outline"

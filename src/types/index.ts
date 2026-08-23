@@ -3,6 +3,7 @@ export type TaskStatus = 'To Do' | 'In Progress' | 'Done';
 
 export interface Workspace {
   _id: string;
+  userEmail?: string;
   name: string;
   slug: string;
   color: string;

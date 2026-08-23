@@ -5,21 +5,49 @@ import ActivityModel from '@/models/Activity';
 import { validateWorkspaceForm } from '@/lib/validation';
 import { DEFAULT_WORKSPACES } from '@/lib/storage';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
-    let workspaces = await WorkspaceModel.find({}).sort({ createdAt: 1 });
+    const { searchParams } = new URL(req.url);
+    const userEmail = (searchParams.get('userEmail') || req.headers.get('x-user-email') || '').toLowerCase().trim();
 
-    // Auto-seed if database is empty
+    if (!userEmail) {
+      return NextResponse.json({ success: true, data: [] });
+    }
+
+    let workspaces = await WorkspaceModel.find({ userEmail }).sort({ createdAt: 1 });
+
+    // Auto-seed if database is empty for this specific user
     if (workspaces.length === 0) {
       workspaces = await WorkspaceModel.insertMany(
         DEFAULT_WORKSPACES.map((w) => ({
+          userEmail,
           name: w.name,
           slug: w.slug,
           color: w.color,
           description: w.description,
         }))
       );
+    } else {
+      // Ensure all default workspaces (Personal and Work) exist for this user
+      for (const defaultWs of DEFAULT_WORKSPACES) {
+        const exists = workspaces.some(
+          (w) => w.slug === defaultWs.slug || w.name.toLowerCase() === defaultWs.name.toLowerCase()
+        );
+        if (!exists) {
+          const createdWs = await WorkspaceModel.create({
+            userEmail,
+            name: defaultWs.name,
+            slug: defaultWs.slug,
+            color: defaultWs.color,
+            description: defaultWs.description,
+          }).catch(() => null);
+
+          if (createdWs) {
+            workspaces.push(createdWs);
+          }
+        }
+      }
     }
 
     return NextResponse.json({ success: true, data: workspaces });
@@ -38,6 +66,11 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
     const body = await req.json();
     const { name, color, description } = body;
+    const userEmail = (body.userEmail || req.headers.get('x-user-email') || '').toLowerCase().trim();
+
+    if (!userEmail) {
+      return NextResponse.json({ success: false, error: 'User email is required' }, { status: 400 });
+    }
 
     const validation = validateWorkspaceForm(name);
     if (!validation.isValid) {
@@ -45,7 +78,7 @@ export async function POST(req: NextRequest) {
     }
 
     const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
-    const existing = await WorkspaceModel.findOne({ slug });
+    const existing = await WorkspaceModel.findOne({ userEmail, slug });
     if (existing) {
       return NextResponse.json(
         { success: false, error: 'A workspace with a similar name already exists.' },
@@ -54,6 +87,7 @@ export async function POST(req: NextRequest) {
     }
 
     const workspace = await WorkspaceModel.create({
+      userEmail,
       name: name.trim(),
       slug,
       color: color || '#6366f1',
@@ -62,6 +96,7 @@ export async function POST(req: NextRequest) {
 
     // Automatically log activity
     await ActivityModel.create({
+      userEmail,
       action: 'workspace_created',
       message: `Workspace "${workspace.name}" created`,
       workspaceName: workspace.name,

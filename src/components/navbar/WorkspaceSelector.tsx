@@ -105,7 +105,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
             if (ws.slug === 'work') IconComponent = Briefcase;
 
             return (
-              <div key={ws._id} className="relative group">
+              <div key={ws._id} className="relative group flex items-center">
                 <button
                   onClick={() => onSelectWorkspace(ws._id)}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all ${

@@ -32,9 +32,12 @@ import { TaskModal } from '@/components/tasks/TaskModal';
 import { ActivitySidebar } from '@/components/activity/ActivitySidebar';
 import { ToastContainer, ToastMessage } from '@/components/ui/Toast';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { UserEmailModal } from '@/components/auth/UserEmailModal';
 
 export default function DashboardPage() {
   const [darkMode, setDarkMode] = useState(true);
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -79,10 +82,13 @@ export default function DashboardPage() {
   }, [darkMode]);
 
   // Initial Data Fetching (API with LocalStorage sync)
-  const loadData = async () => {
+  const loadData = async (targetEmail?: string) => {
+    const activeEmail = targetEmail || userEmail;
+    if (!activeEmail) return;
+
     try {
       // 1. Fetch Workspaces from MongoDB API
-      const wsRes = await fetch('/api/workspaces');
+      const wsRes = await fetch(`/api/workspaces?userEmail=${encodeURIComponent(activeEmail)}`);
       if (wsRes.ok) {
         const wsData = await wsRes.json();
         if (wsData.offline) {
@@ -100,7 +106,7 @@ export default function DashboardPage() {
       }
 
       // 2. Fetch Tasks from MongoDB API
-      const taskRes = await fetch('/api/tasks');
+      const taskRes = await fetch(`/api/tasks?userEmail=${encodeURIComponent(activeEmail)}`);
       if (taskRes.ok) {
         const tData = await taskRes.json();
         if (tData.success && tData.data) {
@@ -110,7 +116,7 @@ export default function DashboardPage() {
       }
 
       // 3. Fetch Activities from MongoDB API
-      const actRes = await fetch('/api/activities?limit=10');
+      const actRes = await fetch(`/api/activities?userEmail=${encodeURIComponent(activeEmail)}&limit=10`);
       if (actRes.ok) {
         const aData = await actRes.json();
         if (aData.success && aData.data) {
@@ -128,8 +134,24 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    loadData();
+    const savedEmail = localStorage.getItem('taskflow_user_email');
+    if (savedEmail) {
+      setUserEmail(savedEmail);
+      loadData(savedEmail);
+    } else {
+      setIsEmailModalOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleSaveEmail = (newEmail: string) => {
+    const formatted = newEmail.trim().toLowerCase();
+    localStorage.setItem('taskflow_user_email', formatted);
+    setUserEmail(formatted);
+    setIsEmailModalOpen(false);
+    showToast(`Active session set to ${formatted}`, 'success');
+    loadData(formatted);
+  };
 
   // Helper to log user action in UI & Storage
   const logUserAction = async (
@@ -144,8 +166,8 @@ export default function DashboardPage() {
     try {
       await fetch('/api/activities', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAct),
+        headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail },
+        body: JSON.stringify({ ...newAct, userEmail }),
       });
     } catch {}
   };
@@ -161,7 +183,11 @@ export default function DashboardPage() {
     setWorkspaces(DEFAULT_WORKSPACES);
 
     try {
-      const res = await fetch('/api/seed', { method: 'POST' });
+      const res = await fetch('/api/seed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail },
+        body: JSON.stringify({ userEmail }),
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -196,8 +222,8 @@ export default function DashboardPage() {
     try {
       const res = await fetch('/api/workspaces', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, color, description }),
+        headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail },
+        body: JSON.stringify({ name, color, description, userEmail }),
       });
       const data = await res.json();
       if (data.success && data.data && !data.offline) {
@@ -223,7 +249,10 @@ export default function DashboardPage() {
     if (!ws) return;
 
     try {
-      await fetch(`/api/workspaces/${id}`, { method: 'DELETE' });
+      await fetch(`/api/workspaces/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-user-email': userEmail },
+      });
     } catch {}
 
     const updatedWs = workspaces.filter((w) => w._id !== id);
@@ -251,8 +280,8 @@ export default function DashboardPage() {
       try {
         const res = await fetch(`/api/tasks/${taskId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail },
+          body: JSON.stringify({ ...formData, userEmail }),
         });
         const data = await res.json();
         if (data.success && data.data && !data.offline) {
@@ -283,8 +312,8 @@ export default function DashboardPage() {
       try {
         const res = await fetch('/api/tasks', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail },
+          body: JSON.stringify({ ...formData, userEmail }),
         });
         const data = await res.json();
         if (data.success && data.data && !data.offline) {
@@ -329,8 +358,8 @@ export default function DashboardPage() {
     try {
       await fetch(`/api/tasks/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        headers: { 'Content-Type': 'application/json', 'x-user-email': userEmail },
+        body: JSON.stringify({ status: newStatus, userEmail }),
       });
     } catch {}
   };
@@ -355,8 +384,15 @@ export default function DashboardPage() {
   // Filter & Workspace Task Filtering Logic
   const workspaceFilteredTasks = useMemo(() => {
     if (activeWorkspaceId === 'all') return tasks;
-    return tasks.filter((t) => t.workspaceId === activeWorkspaceId);
-  }, [tasks, activeWorkspaceId]);
+    const activeWs = workspaces.find((w) => w._id === activeWorkspaceId);
+    return tasks.filter((t) => {
+      if (t.workspaceId === activeWorkspaceId) return true;
+      if (activeWs) {
+        if (t.workspaceId === activeWs.slug || t.workspaceId === `ws-${activeWs.slug}`) return true;
+      }
+      return false;
+    });
+  }, [tasks, activeWorkspaceId, workspaces]);
 
   const displayedTasks = useMemo(() => {
     return filterAndSortTasks(workspaceFilteredTasks, filterOptions);
@@ -384,6 +420,8 @@ export default function DashboardPage() {
         onSeedData={handleSeedData}
         activityCount={activities.length}
         isSeeding={isSeeding}
+        userEmail={userEmail}
+        onOpenEmailModal={() => setIsEmailModalOpen(true)}
       />
 
       {/* Workspace Switcher Bar */}
@@ -465,6 +503,15 @@ export default function DashboardPage() {
         title="Delete Task"
         message="Are you sure you want to delete this task? This action cannot be undone."
         confirmText="Delete Task"
+      />
+
+      {/* User Email Authentication Modal */}
+      <UserEmailModal
+        isOpen={isEmailModalOpen}
+        currentEmail={userEmail}
+        onSaveEmail={handleSaveEmail}
+        onClose={() => setIsEmailModalOpen(false)}
+        canCancel={!!userEmail}
       />
 
       {/* Toast Notification Container */}

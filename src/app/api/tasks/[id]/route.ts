@@ -34,8 +34,10 @@ export async function PUT(
 
     // Log Activity
     try {
+      const userEmail = existingTask.userEmail || (body.userEmail || req.headers.get('x-user-email') || '').toLowerCase().trim();
       if (body.status && body.status !== oldStatus) {
         await ActivityModel.create({
+          userEmail,
           action: 'task_status_changed',
           message: `Task "${updatedTask?.title}" marked as ${body.status}`,
           taskTitle: updatedTask?.title,
@@ -43,6 +45,7 @@ export async function PUT(
         });
       } else {
         await ActivityModel.create({
+          userEmail,
           action: 'task_updated',
           message: `Task "${updatedTask?.title}" updated`,
           taskTitle: updatedTask?.title,
@@ -72,9 +75,11 @@ export async function DELETE(
 
     const task = await TaskModel.findById(id);
     if (task) {
+      const userEmail = task.userEmail || req.headers.get('x-user-email') || '';
       await TaskModel.findByIdAndDelete(id);
       try {
         await ActivityModel.create({
+          userEmail,
           action: 'task_deleted',
           message: `Task "${task.title}" deleted`,
           taskTitle: task.title,

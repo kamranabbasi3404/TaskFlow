@@ -10,13 +10,18 @@ export async function GET(req: NextRequest) {
     await connectToDatabase();
     const { searchParams } = new URL(req.url);
 
+    const userEmail = (searchParams.get('userEmail') || req.headers.get('x-user-email') || '').toLowerCase().trim();
+    if (!userEmail) {
+      return NextResponse.json({ success: true, data: [] });
+    }
+
     const workspaceId = searchParams.get('workspaceId');
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
     const search = searchParams.get('search');
     const sortBy = searchParams.get('sortBy') || 'dueDateAsc';
 
-    const query: any = {};
+    const query: any = { userEmail };
 
     if (workspaceId && workspaceId !== 'all') {
       query.workspaceId = workspaceId;
@@ -59,6 +64,11 @@ export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
     const body = await req.json();
+    const userEmail = (body.userEmail || req.headers.get('x-user-email') || '').toLowerCase().trim();
+
+    if (!userEmail) {
+      return NextResponse.json({ success: false, error: 'User email is required' }, { status: 400 });
+    }
 
     const validation = validateTaskForm(body);
     if (!validation.isValid) {
@@ -66,6 +76,7 @@ export async function POST(req: NextRequest) {
     }
 
     const task = await TaskModel.create({
+      userEmail,
       workspaceId: body.workspaceId,
       title: body.title.trim(),
       description: body.description ? body.description.trim() : '',
@@ -84,6 +95,7 @@ export async function POST(req: NextRequest) {
 
     // Automatically log activity
     await ActivityModel.create({
+      userEmail,
       action: 'task_created',
       message: `Task "${task.title}" created${workspaceName ? ` in ${workspaceName}` : ''}`,
       taskTitle: task.title,

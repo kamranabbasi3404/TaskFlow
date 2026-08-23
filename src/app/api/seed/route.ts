@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import WorkspaceModel from '@/models/Workspace';
 import TaskModel from '@/models/Task';
@@ -19,20 +19,28 @@ const INITIAL_WORKSPACES = [
   },
 ];
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
+    const body = await req.json().catch(() => ({}));
+    const userEmail = (body.userEmail || req.headers.get('x-user-email') || '').toLowerCase().trim();
 
-    // Clear all existing tasks, activities and reset workspaces
-    await TaskModel.deleteMany({});
-    await ActivityModel.deleteMany({});
-    await WorkspaceModel.deleteMany({});
+    if (!userEmail) {
+      return NextResponse.json({ success: false, error: 'User email is required' }, { status: 400 });
+    }
 
-    const workspaces = await WorkspaceModel.insertMany(INITIAL_WORKSPACES);
+    // Clear existing tasks, activities and reset workspaces for this user
+    await TaskModel.deleteMany({ userEmail });
+    await ActivityModel.deleteMany({ userEmail });
+    await WorkspaceModel.deleteMany({ userEmail });
+
+    const workspaces = await WorkspaceModel.insertMany(
+      INITIAL_WORKSPACES.map((w) => ({ ...w, userEmail }))
+    );
 
     return NextResponse.json({
       success: true,
-      message: 'Database reset & all sample tasks permanently deleted!',
+      message: 'Database reset & all sample tasks permanently deleted for user!',
       data: { workspaces, tasks: [], activities: [] },
     });
   } catch (error: any) {

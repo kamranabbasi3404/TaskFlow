@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface ITask extends Document {
+  userEmail: string;
   workspaceId: string;
   title: string;
   description: string;
@@ -13,6 +14,7 @@ export interface ITask extends Document {
 
 const TaskSchema: Schema = new Schema(
   {
+    userEmail: { type: String, required: true, index: true, lowercase: true, trim: true },
     workspaceId: { type: String, required: true, index: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '', trim: true },
