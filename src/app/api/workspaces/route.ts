@@ -35,16 +35,37 @@ export async function GET(req: NextRequest) {
           (w) => w.slug === defaultWs.slug || w.name.toLowerCase() === defaultWs.name.toLowerCase()
         );
         if (!exists) {
-          const createdWs = await WorkspaceModel.create({
-            userEmail,
-            name: defaultWs.name,
-            slug: defaultWs.slug,
-            color: defaultWs.color,
-            description: defaultWs.description,
-          }).catch(() => null);
+          let wsItem: any = await WorkspaceModel.findOne({ slug: defaultWs.slug, userEmail: '' }).catch(() => null);
+          if (wsItem) {
+            wsItem.userEmail = userEmail;
+            await wsItem.save().catch(() => {});
+          } else {
+            wsItem = await WorkspaceModel.create({
+              userEmail,
+              name: defaultWs.name,
+              slug: `${defaultWs.slug}-${Date.now().toString(36)}`,
+              color: defaultWs.color,
+              description: defaultWs.description,
+            }).catch(() => null);
+          }
 
-          if (createdWs) {
-            workspaces.push(createdWs);
+          if (!wsItem) {
+            wsItem = {
+              _id: `ws-${defaultWs.slug}`,
+              userEmail,
+              name: defaultWs.name,
+              slug: defaultWs.slug,
+              color: defaultWs.color,
+              description: defaultWs.description,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+          }
+
+          if (defaultWs.slug === 'personal') {
+            workspaces.unshift(wsItem);
+          } else {
+            workspaces.push(wsItem);
           }
         }
       }
